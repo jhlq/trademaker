@@ -3,8 +3,8 @@ var Amount = require('ripple-lib').Amount;
 
 var CURRENCY = process.argv[4];
 var ISSUER   = process.argv[5];
-var MY_ADDRESS         = 'rw8iVnARvhQ3WNMUEAaamSHqBEGzTrnAEE'; // jsbot
-var MY_SECRET         = 'ssJKV6dnA88ZL71m6kGYt98bzHc2W';       // jsbot secret
+var MY_ADDRESS         = 'rrr';
+var MY_SECRET         = 'sss';       
 
 var TAKER_GETS   = {currency: CURRENCY, value:  process.argv[3], issuer: ISSUER};
 var TAKER_PAYS   = process.argv[2]*1000000;//first commandlineargument times dropsperxrp
