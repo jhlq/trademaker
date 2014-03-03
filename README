@@ -1,4 +1,4 @@
-Add currencies to the "trade" file in the following format:
+Add currencies and XRP boundaries to the "trade" file in the following format:
 CUR,issuer,sell?,sell for,buy?,buy for,spread limit
 
 At terminal type
