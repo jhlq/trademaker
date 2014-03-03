@@ -1,0 +1,9 @@
+Add currencies to the "trade" file in the following format:
+CUR,issuer,sell?,sell for,buy?,buy for,spread limit
+
+At terminal type
+julia -L trademaker.jl
+
+then
+
+startrading()
