@@ -37,7 +37,6 @@ remote.connect(function() {
 			from: MY_ADDRESS,
 			taker_pays: TAKER_PAYS,   
 			taker_gets: TAKER_GETS,
-			cancel_sequence: process.argv[6]
 		});
 	}
 
