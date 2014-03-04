@@ -25,12 +25,21 @@ remote.connect(function() {
 	remote.set_secret(MY_ADDRESS, MY_SECRET);
 	var transaction = remote.transaction();
 
-	transaction.offer_create({
-		from: MY_ADDRESS,
-		taker_pays: TAKER_PAYS,   
-		taker_gets: TAKER_GETS,
-		cancel_sequence: process.argv[6]
-	});
+	if (process.argv[6]!=0){
+		transaction.offer_create({
+			from: MY_ADDRESS,
+			taker_pays: TAKER_PAYS,   
+			taker_gets: TAKER_GETS,
+			cancel_sequence: process.argv[6]
+		});
+	} else {
+		transaction.offer_create({
+			from: MY_ADDRESS,
+			taker_pays: TAKER_PAYS,   
+			taker_gets: TAKER_GETS,
+			cancel_sequence: process.argv[6]
+		});
+	}
 
 	transaction.submit(function(err, res) {
 		console.log(JSON.stringify(err, null, 4));
