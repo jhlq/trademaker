@@ -1,8 +1,12 @@
-prevhighestbids=zeros(1)
-prevlowestoffers=zeros(1)
-precision=0.001
-sellseq=zeros(1)
-buyseq=zeros(1)
+
+type Storage
+	prevhighestbids::Array
+	prevlowestoffers::Array
+	precision::Float64
+	sellseq::Array
+	buyseq::Array
+end
+sto=Storage(zeros(1),zeros(1),0.001,zeros(1),zeros(1))
 
 function getseq(log::String)
 	logfeed=open("$(log)","r")
@@ -10,7 +14,7 @@ function getseq(log::String)
 	while !ismatch(r"(Sequence)",l) && l!=""
 		l=readline(logfeed)
 	end
-	println(l)
+#	println(l)
 	seqbegin=match(r"[0-9]",l)
 	seqend=match(r"([0-9],)",l)
 	seq=float(l[seqbegin.offset:seqend.offset])
@@ -23,7 +27,7 @@ function resetlog(log::String)
 	close(log)
 end
 	
-function startrading(prevhighestbids=prevhighestbids,prevlowestoffers=prevlowestoffers, buyseq=buyseq,sellseq=sellseq)
+function startrading(account,secret)
 while true
 	tradethese=readdlm("trade",',')
 	currencies=tradethese[:,1]
@@ -34,21 +38,21 @@ while true
 	buyforlist=convert(Array{Float64},tradethese[:,6])
 	spreadlims=convert(Array{Float64},tradethese[:,7])
 	ncurr=length(currencies)
-	tprevhighestbids=prevhighestbids
-	prevhighestbids=zeros(ncurr)
-	tprevlowestoffers=prevlowestoffers
-	prevlowestoffers=zeros(ncurr)
-	tsellseq=sellseq
-	sellseq=zeros(ncurr)
-	tbuyseq=buyseq
-	buyseq=zeros(ncurr)
+	tprevhighestbids=sto.prevhighestbids
+	sto.prevhighestbids=zeros(ncurr)
+	tprevlowestoffers=sto.prevlowestoffers
+	sto.prevlowestoffers=zeros(ncurr)
+	tsellseq=sto.sellseq
+	sto.sellseq=zeros(ncurr)
+	tbuyseq=sto.buyseq
+	sto.buyseq=zeros(ncurr)
 	for t in 1:min(ncurr,length(tprevhighestbids))
-		prevhighestbids[t]=tprevhighestbids[t]
-		prevlowestoffers[t]=tprevlowestoffers[t]
+		sto.prevhighestbids[t]=tprevhighestbids[t]
+		sto.prevlowestoffers[t]=tprevlowestoffers[t]
 	end
 	for t in 1:min(ncurr,length(tsellseq))
-		sellseq[t]=tsellseq[t]
-		buyseq[t]=tbuyseq[t]
+		sto.sellseq[t]=tsellseq[t]
+		sto.buyseq[t]=tbuyseq[t]
 	end
 for cur in 1:ncurr
 try
@@ -138,30 +142,30 @@ print(3)
 print(4)
 if dobuy=="true" || dobuy==true
 	amountCUR=buyfor/highestbid
-#	if highestbid<(1-precision)*prevhighestbids[cur] || highestbid>(1+precision)*prevhighestbids[cur] 
+#	if highestbid<(1-sto.precision)*sto.prevhighestbids[cur] || highestbid>(1+sto.precision)*sto.prevhighestbids[cur] 
 		resetlog("buylog.txt")
-		run(`node buyseq.js $(round(buyfor,6)) $(round(amountCUR,6)) $(currencies[cur]) $(issuers[cur]) $(int(buyseq[cur]))` |> "buylog.txt") 
+		run(`node buyseq.js $(round(buyfor,6)) $(round(amountCUR,6)) $(currencies[cur]) $(issuers[cur]) $(int(sto.buyseq[cur])) $account $secret` |> "buylog.txt")  
 		println("Sent a bid of $buyfor XRP for $amountCUR $(currencies[cur]).")
-		prevhighestbids[cur]=highestbid
+		sto.prevhighestbids[cur]=highestbid
 		seq=getseq("buylog.txt")
-		buyseq[cur]=seq
+		sto.buyseq[cur]=seq
 #	end
 end
 print(5)
 	#println(dosell)
 if dosell=="true" || dosell==true
 	botoffer=sell4amount/lowestoffer
-#	if lowestoffer<(1-precision)*prevlowestoffers[cur] || lowestoffer>(1+precision)*prevlowestoffers[cur]
+#	if lowestoffer<(1-sto.precision)*sto.prevlowestoffers[cur] || lowestoffer>(1+sto.precision)*sto.prevlowestoffers[cur]
 		resetlog("sellog.txt")
-		run(`node sellseq.js $(round(sell4amount,6)) $(round(botoffer,6)) $(currencies[cur]) $(issuers[cur]) $(int(sellseq[cur]))` |> "sellog.txt") 
+		run(`node sellseq.js $(round(sell4amount,6)) $(round(botoffer,6)) $(currencies[cur]) $(issuers[cur]) $(int(sto.sellseq[cur])) $account $secret` |> "sellog.txt") 
 		println("Sent a offer of $botoffer $(currencies[cur]) for $sell4amount XRP.")
-		prevlowestoffers[cur]=lowestoffer
-		sellseq[cur]=getseq("sellog.txt")
+		sto.prevlowestoffers[cur]=lowestoffer
+		sto.sellseq[cur]=getseq("sellog.txt")
 #	end
 end
 print(6)
-	bidmove=highestbid/prevhighestbids[cur]
-	offermove=lowestoffer/prevlowestoffers[cur]
+	bidmove=highestbid/sto.prevhighestbids[cur]
+	offermove=lowestoffer/sto.prevlowestoffers[cur]
 	println("Highestbid: $highestbid ($foramount $(currencies[cur]) for $buyoffer XRP) Change: $bidmove")
 	println("Lowestoffer: $lowestoffer ($takergets $(currencies[cur]) for $XRPrice XRP) Change: $offermove")
 catch er

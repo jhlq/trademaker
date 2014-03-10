@@ -3,8 +3,8 @@ var Amount = require('ripple-lib').Amount;
 
 var CURRENCY = process.argv[4];
 var ISSUER   = process.argv[5];
-var MY_ADDRESS         = 'rrr'; 
-var MY_SECRET         = 'sss';      
+var MY_ADDRESS         = process.argv[7];
+var MY_SECRET         = process.argv[8];
 
 var TAKER_GETS   = process.argv[2]*1000000;//first commandlineargument times dropsperxrp
 var TAKER_PAYS   = {currency: CURRENCY, value:  process.argv[3], issuer: ISSUER};
