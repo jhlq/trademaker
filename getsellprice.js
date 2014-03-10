@@ -26,12 +26,27 @@ remote.connect(function() {
 		},
 		limit: 1
 	});
+	var dc=0;
+	request.on('success',function(msg){
+		console.log('Success! ');
+		remote.disconnect();
+		dc=1;
+	});
+	request.on('error',function(msg){
+		console.log('Something went wrong. ');
+		remote.disconnect();
+		dc=1;
+	});
 
 	request.request();
 
 	setTimeout(function() {
-		remote.disconnect();
-	}, (45 * 1000));
+		if (dc==0){
+			setTimeout(function() {
+				remote.disconnect();
+			}, (45 * 1000));
+		}
+	},(5*1000));
 });
 
 

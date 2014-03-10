@@ -39,13 +39,27 @@ remote.connect(function() {
 			taker_gets: TAKER_GETS
 		});
 	}
+	var dc=0;
+	remote.on('success',function(msg){
+		console.log('Success! ');
+		remote.disconnect();
+		dc=1;
+	});
+	remote.on('error',function(msg){
+		console.log('Something went wrong. ');
+		remote.disconnect();
+		dc=1;
+	});
 
 	transaction.submit(function(err, res) {
 		console.log(JSON.stringify(err, null, 4));
 		console.log(JSON.stringify(res, null, 4));
 	});
-
 	setTimeout(function() {
-		remote.disconnect();
-	}, (45 * 1000)); //allow 15 seconds for the transaction to complete
+		if (dc==0){
+			setTimeout(function() {
+				remote.disconnect();
+			}, (45 * 1000));
+		}
+	},(5*1000));
 });
