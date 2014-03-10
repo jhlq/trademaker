@@ -5,8 +5,10 @@ type Storage
 	precision::Float64
 	sellseq::Array
 	buyseq::Array
+	paustime::Int32
+	sleeptime::Int32
 end
-sto=Storage(zeros(1),zeros(1),0.001,zeros(1),zeros(1))
+sto=Storage(zeros(1),zeros(1),0.001,zeros(1),zeros(1),60,600)
 
 function getseq(log::String)
 	logfeed=open("$(log)","r")
@@ -55,6 +57,9 @@ while true
 		sto.buyseq[t]=tbuyseq[t]
 	end
 for cur in 1:ncurr
+	if currencies[cur]=="BREAK"
+		break
+	end
 try
 	println(currencies[cur])
 ###GET SPREAD
@@ -146,7 +151,6 @@ if dobuy=="true" || dobuy==true
 		resetlog("buylog.txt")
 		run(`node buyseq.js $(round(buyfor,6)) $(round(amountCUR,6)) $(currencies[cur]) $(issuers[cur]) $(int(sto.buyseq[cur])) $account $secret` |> "buylog.txt")  
 		println("Sent a bid of $buyfor XRP for $amountCUR $(currencies[cur]).")
-		sto.prevhighestbids[cur]=highestbid
 		seq=getseq("buylog.txt")
 		sto.buyseq[cur]=seq
 #	end
@@ -159,20 +163,21 @@ if dosell=="true" || dosell==true
 		resetlog("sellog.txt")
 		run(`node sellseq.js $(round(sell4amount,6)) $(round(botoffer,6)) $(currencies[cur]) $(issuers[cur]) $(int(sto.sellseq[cur])) $account $secret` |> "sellog.txt") 
 		println("Sent a offer of $botoffer $(currencies[cur]) for $sell4amount XRP.")
-		sto.prevlowestoffers[cur]=lowestoffer
 		sto.sellseq[cur]=getseq("sellog.txt")
 #	end
 end
 print(6)
 	bidmove=highestbid/sto.prevhighestbids[cur]
 	offermove=lowestoffer/sto.prevlowestoffers[cur]
+	sto.prevhighestbids[cur]=highestbid
+	sto.prevlowestoffers[cur]=lowestoffer
 	println("Highestbid: $highestbid ($foramount $(currencies[cur]) for $buyoffer XRP) Change: $bidmove")
 	println("Lowestoffer: $lowestoffer ($takergets $(currencies[cur]) for $XRPrice XRP) Change: $offermove")
 catch er
 	println(er)
 end
-	sleep(60)
+	sleep(sto.paustime)
 end #for
-	sleep(600)
+	sleep(sto.sleeptime)
 end
 end #trading
