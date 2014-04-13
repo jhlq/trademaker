@@ -78,7 +78,7 @@ function mutate(net,nm::Integer)
 	return nets
 end
 function sigmoid(x)
-	return abs(x)/(abs(x)+1)
+	return x/(abs(x)+1)
 end
 function feed(net,d)
 	(nil,nml,nol)=net[end][1],net[end][2],net[end][3]
