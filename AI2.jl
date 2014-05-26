@@ -59,6 +59,9 @@ end
 function sigmoid(x)
 	return x/(abs(x)+1)
 end
+function sigmoid(x::Array)
+	return x./(abs(x)+1)
+end
 function feed(net,d)
 	(nil,nml,nol)=net[end][1],net[end][2],net[end][3]
 	
@@ -141,29 +144,32 @@ function netco(m::Mutator,i::Integer)
 	end
 	return l,n
 end
-function poke!(net::Array,m::Mutator)
+function poke!(net::Array,m::Mutator,numit::Int64=3)
 	(bars,bval)=rsample()
 	il,ml,ol=m.ilmlol
 	tbars=transpatinvari(bars)
 	pred=feed(net,tbars)
-	score=simil(sum(pred)/3,bval)
+	tscore=simil(sum(pred)/3,bval)
+	score=tscore
 	s1=sum(m.scoreimps[1])
 	s2=sum(m.scoreimps[2])
 	m1=maximum(m.scoreimps[1])
 	m2=maximum(m.scoreimps[2])
+
+	for n in 1:numit
 
 	r=[abs(rand(Float64)*s1),abs(rand(Float64)*s2)]
 	ri=1
 	rn=[1,1]
 	ra=[1,1]
 	ts=0
-	println(r)
+	#println(r)
 	for layer in 1:2
 		ts=0
 		b=false
 		for i in 1:length(m.scoreimps[layer][:,1])
 			
-			print("$ts, ")
+			#print("$ts, ")
 			for j in 1:length(m.scoreimps[layer][1,:])
 				ts+=m.scoreimps[layer][i,j]
 				
@@ -181,13 +187,17 @@ function poke!(net::Array,m::Mutator)
 	end
 
 	#l,n,a=randcon(il,ml,ol)
-	println("$rn,$ra")
+	#println("$rn,$ra")
+	
 	for layer in 1:2
+		score=simil(sum(feed(net,tbars))/3,bval)
+		ov=net[layer][rn[layer],ra[layer]]
 		net[layer][rn[layer],ra[layer]]*=m.mutfac[layer][rn[layer],ra[layer]]
 		nscore=simil(sum(feed(net,tbars))/3,bval)
 		if nscore>score
 			#m.pokesult[ri]+=1
 			m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
+			println(1)
 		else
 			net[layer][rn[layer],ra[layer]]=net[layer][rn[layer],ra[layer]]/(-m.mutfac[layer][rn[layer],ra[layer]])
 			nscore=simil(sum(feed(net,tbars))/3,bval)
@@ -195,26 +205,40 @@ function poke!(net::Array,m::Mutator)
 				#m.pokesult[ri]+=1
 				m.mutfac[layer][rn[layer],ra[layer]]=-m.mutfac[layer][rn[layer],ra[layer]]
 				m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
+				println(2)
 			else 
 				net[layer][rn[layer],ra[layer]]*=m.mutfac[layer][rn[layer],ra[layer]]*1.1
 				nscore=simil(sum(feed(net,tbars))/3,bval)
 				if nscore>score
 					m.mutfac[layer][rn[layer],ra[layer]]*=1.1
 					m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
+					println(3)
 				else 
 					net[layer][rn[layer],ra[layer]]*=m.mutfac[layer][rn[layer],ra[layer]]*0.9
 					nscore=simil(sum(feed(net,tbars))/3,bval)
 					if nscore>score
 						m.mutfac[layer][rn[layer],ra[layer]]*=0.9
 						m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
+						println(4)
 					else 
 						m.mutfac[layer][rn[layer],ra[layer]]*=rand()*6-3
 						m.scoreimps[layer][rn[layer],ra[layer]]=minimum(m.scoreimps[layer])*0.5
+						net[layer][rn[layer],ra[layer]]=ov
 					end
 				end
 			end
 		end
-	end	
+	end
+	
+	end
+
+	net[1]=sigmoid(net[1])
+	net[2]=sigmoid(net[2])
+	m.mutfac[1]=5*sigmoid(m.mutfac[1])
+	m.mutfac[2]=5*sigmoid(m.mutfac[2])
+	pred=feed(net,tbars)
+	return simil(sum(pred)/3,bval)-tscore
+
 end
 	
 function evolve2(net=makenet(33,50,3),gens=3,its=9)
