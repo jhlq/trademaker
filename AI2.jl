@@ -1,9 +1,25 @@
+#Article describing this code: http://jhlq.wordpress.com/2014/06/09/ripple-ml-2/
+
+function transpatinvari(d) #spatially invariant transform
+	dn=d/maximum(abs(d))
+	nd=length(dn)
+	if nd%2==0
+		push!(dn,0)
+		nd+=1
+	end
+	t=zeros(nd)
+	for da in 1:nd
+		for dat in 0:nd-da
+			t[1+dat]+=dn[da]*simil(dn[da],dn[da+dat])
+		end
+	end
+	return t
+end
 using JSON
-#using Requests
 function rsample()
 	start=1000*abs(rand(Int)%100)
 	trades=JSON.parse(readall(`curl https://ripple.com/chart/BTC/XRP/trades.json?since=$start`))
-	#trades=JSON.parse(get("https://ripple.com/chart/BTC/XRP/trades.json?since=$start").data)
+	#trades=JSON.parse(get("https://ripple.com/chart/BTC/XRP/trades.json?since=$start").data) #Requests package
 	np=100
 	peek=zeros(np,2)
 	for t in 1:np
@@ -47,13 +63,21 @@ function rsample()
 			break
 		end
 	end
-	return bars,barval
+	return transpatinvari(bars),barval
+end
+function rsamples(ns)
+	tbarsa=Array(Array,ns)
+	barvals=Array(Float64,ns)
+	for i in 1:ns
+		tbarsa[i],barvals[i]=rsample()
+	end
+	return tbarsa,barvals
 end
 function makenet(nil,nml,nol)
 	net=Array(Array,3)
 	net[1]=zeros(nil,nml)+rand(nil,nml).-0.5
 	net[2]=zeros(nml,nol)+rand(nml,nol).-0.5
-	net[3]=[nil,nml,nol]#ones(3)+rand().-0.5
+	net[3]=[nil,nml,nol]
 	return net
 end
 function sigmoid(x)
@@ -62,7 +86,7 @@ end
 function sigmoid(x::Array)
 	return x./(abs(x)+1)
 end
-function feed(net,d)
+function feed(net,d) #nets eat data
 	(nil,nml,nol)=net[end][1],net[end][2],net[end][3]
 	
 	td=zeros(nml)
@@ -71,179 +95,101 @@ function feed(net,d)
 	end
 	s=zeros(nol)
 	for n in 1:nol
-		s[n]=sigmoid(dot(net[2][:,n],td))
+		s[n]=abs(sigmoid(dot(net[2][:,n],td)))
 	end
 	return s
 end
 function simil(v1,v2)
 	1-abs((v1-v2))
 end
-function transpatinvari(d)
-	dn=d/maximum(abs(d))
-	nd=length(dn)
-	if nd%2==0
-		push!(dn,0)
-		nd+=1
-	end
-	t=zeros(nd)
-	for da in 1:nd
-		for dat in 0:nd-da
-			t[1+dat]+=dn[da]*simil(dn[da],dn[da+dat])
-		end
-	end
-	return t
-end
 type Mutator
-	mutfac::Array
 	scoreimps::Array
-	ilmlol
-	bestimprov
 	net
-	data
-	target
 end
-function init(il=33,ml=50,ol=3)
+function init(il=33,ml=50,ol=1) #input layer, middle layer, output layer
 	net=makenet(il,ml,ol)
-	m=Mutator(Array(Array,2),Array(Array,2),[il,ml,ol],0,0,0,0)
-	m.mutfac[1]=(ones(Float64,il,ml)+rand(il,ml).-0.5).+(-2.*int(randbool(il,ml)))
-	m.mutfac[2]=(ones(Float64,ml,ol)+rand(ml,ol).-0.5).+(-2.*int(randbool(ml,ol)))
+	m=Mutator(Array(Array,2),net)
 	m.scoreimps[1]=ones(Float64,il,ml)
 	m.scoreimps[2]=ones(Float64,ml,ol)
-	return net,m
+	return m
 end
-function randcon(il,ml,ol)
-	l=1
-	n=1
-	a=1
-	if randbool()
-		l=2
-		n=abs(rand(Int64))%ml
-		a=abs(rand(Int64))%ol
-	else
-		n=abs(rand(Int64))%il
-		a=abs(rand(Int64))%ml
-	end
-	return l,n,a
-end		
-
-function netco(m::Mutator,i::Integer)
-	(il,ml,ol)=m.ilmlol
-	l=1
-	n=1
-	if i>il
-		if i>il+ml
-			l=3
-			n=i-il-ml
-			print_with_color(:red,"Too high index.")
-		else
-			l=2
-			n=i-il
-		end
-	else
-		n=i
-	end
-	return l,n
-end
-function poke!(net::Array,m::Mutator,numit::Int64=3)
-	(bars,bval)=rsample()
-	il,ml,ol=m.ilmlol
-	tbars=transpatinvari(bars)
+function score(net::Array,tbars::Array{Float64},bval::Number)
 	pred=feed(net,tbars)
-	tscore=simil(sum(pred)/3,bval)
-	score=tscore
-	s1=sum(m.scoreimps[1])
-	s2=sum(m.scoreimps[2])
-	m1=maximum(m.scoreimps[1])
-	m2=maximum(m.scoreimps[2])
+	tscore=simil(sum(pred),bval)
+end
+function score(net::Array,tbars::Array{Array},bvals::Array)
+	ns=length(bvals)
+	scores=zeros(Float64,ns)
+	for i in 1:ns
+		scores[i]=score(net,tbars[i],bvals[i])
+	end
+	return scores
+end
+function poke!(m::Mutator,tbars::Array{Float64},bval::Number,mf=0.1)
+	tscore=score(m.net,tbars,bval)
 
-	for n in 1:numit
-
-	r=[abs(rand(Float64)*s1),abs(rand(Float64)*s2)]
-	ri=1
-	rn=[1,1]
-	ra=[1,1]
+	layer=1
+	if randbool()
+		layer=2
+	end
+	
+	s=sum(m.scoreimps[layer])
+	r=abs(rand(Float64)*s)
+	rn=1 # random neuron
+	ra=1 # random axon
 	ts=0
-	#println(r)
-	for layer in 1:2
-		ts=0
-		b=false
-		for i in 1:length(m.scoreimps[layer][:,1])
+	b=false
+	for i in 1:length(m.scoreimps[layer][:,1])
+		for j in 1:length(m.scoreimps[layer][1,:])
+			ts+=m.scoreimps[layer][i,j]
 			
-			#print("$ts, ")
-			for j in 1:length(m.scoreimps[layer][1,:])
-				ts+=m.scoreimps[layer][i,j]
-				
-				if ts>r[layer]
-					rn[layer]=i
-					ra[layer]=j
-					b=true
-					break
-				end
-			end
-			if b==true
+			if ts>r
+				rn=i
+				ra=j
+				b=true
 				break
 			end
 		end
-	end
-
-	#l,n,a=randcon(il,ml,ol)
-	#println("$rn,$ra")
-	
-	for layer in 1:2
-		score=simil(sum(feed(net,tbars))/3,bval)
-		ov=net[layer][rn[layer],ra[layer]]
-		net[layer][rn[layer],ra[layer]]*=m.mutfac[layer][rn[layer],ra[layer]]
-		nscore=simil(sum(feed(net,tbars))/3,bval)
-		if nscore>score
-			#m.pokesult[ri]+=1
-			m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
-			println(1)
-		else
-			net[layer][rn[layer],ra[layer]]=net[layer][rn[layer],ra[layer]]/(-m.mutfac[layer][rn[layer],ra[layer]])
-			nscore=simil(sum(feed(net,tbars))/3,bval)
-			if nscore>score
-				#m.pokesult[ri]+=1
-				m.mutfac[layer][rn[layer],ra[layer]]=-m.mutfac[layer][rn[layer],ra[layer]]
-				m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
-				println(2)
-			else 
-				net[layer][rn[layer],ra[layer]]*=m.mutfac[layer][rn[layer],ra[layer]]*1.1
-				nscore=simil(sum(feed(net,tbars))/3,bval)
-				if nscore>score
-					m.mutfac[layer][rn[layer],ra[layer]]*=1.1
-					m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
-					println(3)
-				else 
-					net[layer][rn[layer],ra[layer]]*=m.mutfac[layer][rn[layer],ra[layer]]*0.9
-					nscore=simil(sum(feed(net,tbars))/3,bval)
-					if nscore>score
-						m.mutfac[layer][rn[layer],ra[layer]]*=0.9
-						m.scoreimps[layer][rn[layer],ra[layer]]=nscore-score
-						println(4)
-					else 
-						m.mutfac[layer][rn[layer],ra[layer]]*=rand()*6-3
-						m.scoreimps[layer][rn[layer],ra[layer]]=minimum(m.scoreimps[layer])*0.5
-						net[layer][rn[layer],ra[layer]]=ov
-					end
-				end
-			end
+		if b==true
+			break
 		end
 	end
-	
+	ov=m.net[layer][rn,ra]
+	m.net[layer][rn,ra]=mod(m.net[layer][rn,ra]+mf+1,2)-1
+	nscore=score(m.net,tbars,bval)
+	if nscore>tscore
+		m.scoreimps[layer][rn,ra]=nscore-tscore
+	else
+		m.net[layer][rn,ra]=mod(m.net[layer][rn,ra]-2mf+1,2)-1
+		nscore=score(m.net,tbars,bval)
+		if nscore>tscore
+			m.scoreimps[layer][rn,ra]=nscore-tscore
+		else 
+			m.net[layer][rn,ra]=ov
+			m.scoreimps[layer][rn,ra]=minimum(m.scoreimps[layer])
+			#print_with_color(:cyan,"Connection $layer $rn $ra settled at $(net[layer][rn,ra]).")
+		end
 	end
-
-	net[1]=sigmoid(net[1])
-	net[2]=sigmoid(net[2])
-	m.mutfac[1]=5*sigmoid(m.mutfac[1])
-	m.mutfac[2]=5*sigmoid(m.mutfac[2])
-	pred=feed(net,tbars)
-	return simil(sum(pred)/3,bval)-tscore
-
+	return m.scoreimps[layer][rn,ra]
 end
-	
-function evolve2(net=makenet(33,50,3),gens=3,its=9)
-	scores=Array(Array,gens)
-	for gen in 1:gens
-		
+function poke!(m::Mutator,tbars::Array{Array},bval::Array,mf=0.1)
+	ns=length(bval)
+	for i in 1:ns
+		poke!(m,tbars[i],bval[i],mf)
 	end
+end
+function evolve(m::Mutator,tbarsa::Array{Array},barvals::Array{Float64},numit,mf=0.1)
+	bestm=deepcopy(m)
+	bestscore=sum(score(m.net,tbarsa,barvals))
+	println(bestscore)
+	for it in 1:numit
+		poke!(m,tbarsa,barvals,mf)
+		s=sum(score(m.net,tbarsa,barvals))
+		if s>bestscore
+			println(s)
+			bestscore=s
+			bestm=deepcopy(m)
+		end
+	end
+	return bestm
 end
