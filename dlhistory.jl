@@ -18,9 +18,11 @@ function mc(startTime="2015-01-01",endTime="2015-01-02")
 	`curl -X POST -d @rd.txt https://api.ripplecharts.com/api/offers_exercised --header "Content-Type:application/json"`
 end
 r=readall(mc("2015-01-01","2015-01-02"))
+#uncomment the following line to download full history
+#r=readall(mc("2012-01-01","2017-01-01"))
 function parseprice(r)
 	l=search(r,"open\":")
-	if isempty(collect(l))
+	if l==0:-1
 		return Void
 	end
 	l=l[end]
